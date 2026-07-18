@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 interface TrainingViewProps {
   stage: PipelineStage;
   videoUrl: string | null;
+  title: string | null;
   markdown: string | null;
   docsFailed: boolean;
   questions: BuildingQuestion[];
@@ -234,6 +235,7 @@ function QuestionCard({ question }: { question: BuildingQuestion }) {
 export function TrainingView({
   stage,
   videoUrl,
+  title,
   markdown,
   docsFailed,
   questions,
@@ -276,7 +278,12 @@ export function TrainingView({
   ) : null;
 
   return (
-    <div className="flex w-full flex-col gap-6 py-8 lg:flex-row lg:items-start lg:gap-8 lg:py-10">
+    <div
+      className={cn(
+        "flex w-full flex-col gap-6 py-8",
+        videoUrl && "lg:flex-row lg:items-start lg:gap-8 lg:py-10",
+      )}
+    >
       {/* Video: left column on desktop, collapsed by default on mobile */}
       {videoUrl && (
         <div className="lg:sticky lg:top-6 lg:w-[38%] lg:shrink-0 lg:self-start">
@@ -309,7 +316,19 @@ export function TrainingView({
       )}
 
       {/* Generated content: right column */}
-      <div className="flex min-w-0 flex-1 flex-col gap-8">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col gap-8",
+          !videoUrl && "mx-auto w-full max-w-2xl",
+        )}
+      >
+        {/* Title */}
+        {title && (
+          <Reveal>
+            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+          </Reveal>
+        )}
+
         {/* Documentation */}
         {markdown ? (
         <Reveal>
@@ -336,9 +355,9 @@ export function TrainingView({
             </Card>
           </Collapsible>
         </Reveal>
-      ) : docsFailed ? (
+      ) : docsFailed || isDone ? (
         <p className="text-sm text-muted-foreground">
-          Documentation couldn&apos;t be generated for this video.
+          No documentation is available for this training.
         </p>
       ) : (
         <PendingRow label="Writing documentation" />

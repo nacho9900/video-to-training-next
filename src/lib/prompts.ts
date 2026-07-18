@@ -33,6 +33,10 @@ export interface DocsAIResponse {
   documentation: string;
 }
 
+export interface TitleAIResponse {
+  title: string;
+}
+
 function withLanguageNote(prompt: string): string {
   return `${prompt}\n\nIMPORTANT: Respond in ${RESPONSE_LANGUAGE}.`;
 }
@@ -203,6 +207,41 @@ export const distractorsResponseSchema: Schema = {
   },
   required: ["falseOptions"],
 };
+
+// ---- Title ----
+
+export function buildTitlePrompt(text: string): PromptPair {
+  const system =
+    "You write short, descriptive titles for training modules. " +
+    "You capture the subject of the training in a few words.";
+
+  const user =
+    "Based on the training content below, write ONE concise, descriptive title.\n\n" +
+    "RULES:\n" +
+    "- 3 to 7 words, in Title Case.\n" +
+    "- Describe the subject/skill the training covers.\n" +
+    "- No quotes, no trailing punctuation, no the word 'Training' unless it fits naturally.\n\n" +
+    "TRAINING CONTENT:\n" +
+    text;
+
+  return { system, user: withLanguageNote(user) };
+}
+
+export const titleResponseSchema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+  },
+  required: ["title"],
+};
+
+export function isTitleAIResponse(value: unknown): value is TitleAIResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+  const obj = value as Record<string, unknown>;
+  return typeof obj.title === "string";
+}
 
 // ---- Documentation ----
 

@@ -57,6 +57,16 @@ export interface StatusResponse {
   state: GeminiFileState;
 }
 
+// ---- API: POST /api/generate/title ----
+// A short descriptive title for the training, derived from the questions
+// (text-only, cheap model). Used in the history list and shown in the result.
+export interface TitleRequest {
+  text: string;
+}
+export interface TitleResponse {
+  title: string;
+}
+
 // ---- API: POST /api/generate/docs ----
 export interface DocsRequest {
   fileName: string;

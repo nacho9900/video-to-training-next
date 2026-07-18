@@ -6,18 +6,22 @@
 // options one at a time — so the UI can reveal the result piece by piece.
 
 import { useCallback, useRef, useState } from "react";
+import { saveTraining } from "./history";
 import { uploadVideoToBlob } from "./upload-video";
 import type {
   ApiError,
   BuildingQuestion,
   DocsRequest,
   DocsResponse,
+  GeneratedQuestion,
   OptionsRequest,
   OptionsResponse,
   QuestionsRequest,
   QuestionsResponse,
   StageId,
   StatusResponse,
+  TitleRequest,
+  TitleResponse,
   UploadRequest,
   UploadResponse,
 } from "./types";
@@ -59,6 +63,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function fallbackTitle(): string {
+  return `Training — ${new Date().toLocaleDateString()}`;
+}
+
 async function pollUntilActive(
   fileName: string,
   isCurrent: () => boolean,
@@ -87,6 +95,8 @@ export interface UsePipelineReturn {
   progress: number;
   /** Blob URL of the uploaded video, available from the upload step onward. */
   videoUrl: string | null;
+  /** Short descriptive title of the training, null until it's ready. */
+  title: string | null;
   /** Generated documentation markdown, null until it's ready. */
   markdown: string | null;
   /** True if documentation generation failed (the training still completes). */
@@ -102,6 +112,7 @@ export function usePipeline(): UsePipelineReturn {
   const [stage, setStage] = useState<PipelineStage>("idle");
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [title, setTitle] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
   const [docsFailed, setDocsFailed] = useState(false);
   const [questions, setQuestions] = useState<BuildingQuestion[]>([]);
@@ -126,6 +137,7 @@ export function usePipeline(): UsePipelineReturn {
     setStage("idle");
     setProgress(0);
     setVideoUrl(null);
+    setTitle(null);
     setMarkdown(null);
     setDocsFailed(false);
     setQuestions([]);
@@ -138,6 +150,7 @@ export function usePipeline(): UsePipelineReturn {
       const isCurrent = () => runIdRef.current === runId;
 
       setError(null);
+      setTitle(null);
       setMarkdown(null);
       setDocsFailed(false);
       setQuestions([]);
@@ -183,12 +196,18 @@ export function usePipeline(): UsePipelineReturn {
         // text), so we DON'T block on it — it reveals itself whenever it's
         // ready while questions and answers stream in parallel. Docs are
         // secondary (collapsed), so a docs failure doesn't fail the training.
+        // Locals captured for saving the finished training to history.
+        let docsMarkdown: string | null = null;
+        let titleValue: string | null = null;
+        const built: GeneratedQuestion[] = [];
+
         goto("generating_docs");
         const docsPromise = postJson<DocsResponse>("/api/generate/docs", {
           fileName,
           model,
         } satisfies DocsRequest)
           .then((res) => {
+            docsMarkdown = res.markdown;
             if (isCurrent()) setMarkdown(res.markdown);
           })
           .catch(() => {
@@ -214,6 +233,19 @@ export function usePipeline(): UsePipelineReturn {
           })),
         );
 
+        // Kick off the descriptive title from the question texts (cheap,
+        // text-only) — it reveals whenever it's ready, in parallel.
+        const titlePromise = postJson<TitleResponse>("/api/generate/title", {
+          text: cores.map((c, i) => `${i + 1}. ${c.question}`).join("\n"),
+        } satisfies TitleRequest)
+          .then((res) => {
+            titleValue = res.title;
+            if (isCurrent()) setTitle(res.title);
+          })
+          .catch(() => {
+            // Title is optional; a fallback is used when saving.
+          });
+
         // 6. Build answer options one question at a time, revealing each as it
         // completes. Sequential + the cheap model keeps it reliable and fast
         // enough without ever overrunning a serverless timeout.
@@ -225,6 +257,7 @@ export function usePipeline(): UsePipelineReturn {
             { question: cores[i], order } satisfies OptionsRequest,
           );
           if (!isCurrent()) return;
+          built.push(question);
           setQuestions((prev) =>
             prev.map((q) =>
               q.order === question.order
@@ -234,11 +267,20 @@ export function usePipeline(): UsePipelineReturn {
           );
         }
 
-        // Make sure the (decoupled) docs request has settled before we call
-        // the whole run done.
-        await docsPromise;
+        // Make sure the (decoupled) docs and title requests have settled
+        // before we call the whole run done.
+        await Promise.all([docsPromise, titlePromise]);
         if (!isCurrent()) return;
         goto("done");
+
+        // Persist the finished training to local history.
+        saveTraining({
+          id: crypto.randomUUID(),
+          title: titleValue ?? fallbackTitle(),
+          createdAt: Date.now(),
+          markdown: docsMarkdown,
+          questions: built,
+        });
       } catch (err) {
         if (!isCurrent()) return;
         const message =
@@ -254,6 +296,7 @@ export function usePipeline(): UsePipelineReturn {
     stage,
     progress,
     videoUrl,
+    title,
     markdown,
     docsFailed,
     questions,

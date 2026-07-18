@@ -25,8 +25,14 @@ Built with **Next.js 16** (App Router), **shadcn/ui**, and the
 5. For each question, plausible-but-wrong **distractors** are generated (one
    question at a time, using a lighter/cheaper model since this step is
    simple), and the options are shuffled.
-6. The training is revealed as it's built — video, then documentation, then
+6. A short **descriptive title** is generated for the training.
+7. The training is revealed as it's built — video, then documentation, then
    the questions, then each question's answers filling in one by one.
+
+Finished trainings are saved to a **local history** (browser `localStorage`,
+validated with Zod) shown in a sidebar, so you can revisit them later. History
+entries don't replay the video (only the local file plays inline); they show
+the title, documentation, and quiz.
 
 The heavy work is split across several short API calls (orchestrated from the
 client) rather than one long request — see
@@ -127,13 +133,15 @@ src/
       gemini/status/      # poll processing state
       generate/docs/      # documentation from the video
       generate/questions/ # N questions + correct answers
-      generate/options/   # distractors + shuffled options
-    page.tsx              # composes gate -> picker -> processing -> quiz
-  components/             # UI (gate, model select, picker, stepper, quiz)
+      generate/options/   # distractors + shuffled options (one per request)
+      generate/title/     # short descriptive title (cheap model)
+    page.tsx              # composes gate/picker/processing/training + history
+  components/             # UI (gate, picker, training view, history sidebar…)
   lib/
-    gemini.ts             # Google GenAI provider (upload/dedup/generate + fallback)
+    gemini.ts             # Google GenAI provider (upload/generate + fallback)
     prompts.ts            # generation prompts + response schemas
     use-pipeline.ts       # client orchestration of the whole flow
+    history.ts            # localStorage history (Zod-validated)
     types.ts, models.ts   # shared contract
 ```
 
