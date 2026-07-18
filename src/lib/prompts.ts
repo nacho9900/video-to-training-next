@@ -1,8 +1,9 @@
 // Prompts and response schemas for the Gemini generation pipeline.
-// The questions/distractors prompts are ported (with minor wording tweaks —
-// this app has no separate process description, only the video itself) from
-// the proven bloox TrainingQuestionAIFactoryGemini prompts. The docs prompt
-// is new to this app.
+// The two-step question strategy (questions with correct answers, then
+// distractors) is adapted from the proven bloox flow, but the prompts here are
+// domain-agnostic: they work for any explainer video — a software tutorial, a
+// science lesson, a finance explainer, a cooking demo — not just operational
+// procedures.
 
 import { Type, type Schema } from "@google/genai";
 
@@ -40,70 +41,70 @@ function withLanguageNote(prompt: string): string {
 
 export function buildQuestionsPrompt(numberOfQuestions: number): PromptPair {
   const system =
-    "You are an expert in operational processes and employee training assessment. " +
-    "Your specialty is creating clear, specific questions that evaluate comprehension and execution of procedures.";
+    "You are an expert instructional designer and assessment writer. " +
+    "You create clear, specific multiple-choice questions that test genuine understanding of what a video teaches — on any subject, from simple explanations to complex technical topics.";
 
   const user =
     "Generate " +
     numberOfQuestions +
-    " training questions with correct answers based on the provided process video.\n\n" +
+    " questions with correct answers based ONLY on the provided video.\n\n" +
     "CRITICAL - IDENTIFY THE TRUE PURPOSE:\n" +
-    "Before generating questions, determine if the process is:\n" +
-    '- INSTRUCTIONAL/REFERENCE: Teaching how to interpret, read, or understand something (e.g., "How to read labels", "Understanding safety symbols")\n' +
-    '- ACTUAL PROCEDURE: Teaching how to execute a specific task (e.g., "Making chocolate cake", "Cleaning equipment")\n\n' +
-    "For INSTRUCTIONAL content:\n" +
-    "- Focus questions on the METHODOLOGY or INTERPRETATION SKILLS being taught\n" +
-    '- DO NOT ask about specific examples shown (e.g., if showing a steak label as example, don\'t ask "What cut of meat was shown?")\n' +
-    '- Ask about the PROCESS of reading/interpreting (e.g., "What information should you check first on a food label?")\n\n' +
-    "For ACTUAL PROCEDURE content:\n" +
-    "- Focus questions on specific steps, materials, techniques, and safety measures\n" +
-    "- Ask about the actual execution of the task\n\n" +
+    "Before writing questions, determine what the video is really teaching:\n" +
+    '- CONCEPTUAL/INSTRUCTIONAL: explaining how to understand, interpret, or reason about something (e.g., "How compound interest works", "How to read a chart").\n' +
+    '- PROCEDURAL/HOW-TO: demonstrating how to carry out a specific task step by step (e.g., "How to deploy an app", "How to solve this equation").\n\n' +
+    "For CONCEPTUAL/INSTRUCTIONAL content:\n" +
+    "- Focus on the ideas, principles, and reasoning being taught.\n" +
+    "- DO NOT ask about incidental examples used only to illustrate a point (e.g., if a specific chart is shown as an example, don't ask about that chart's exact numbers).\n" +
+    '- Ask about the underlying concept or method (e.g., "What does a steeper slope on this kind of chart indicate?").\n\n' +
+    "For PROCEDURAL/HOW-TO content:\n" +
+    "- Focus on the specific steps, their order, the tools or inputs used, and common pitfalls.\n" +
+    "- Ask about how the task is actually performed.\n\n" +
     "GUIDELINES:\n" +
-    "- Each question must focus on a specific, distinct aspect of the process\n" +
-    "- Questions should be clear, concise, and unambiguous\n" +
-    "- Base questions ONLY on the provided video content\n" +
-    "- Avoid redundancy between questions\n" +
-    "- Correct answers should be specific and directly verifiable from the content\n" +
-    "- Provide a clear, pedagogical explanation for why the correct answer is correct\n" +
-    "- Include the exact timestamp (in seconds) where this content appears in the video\n" +
-    "- Use metric system for measurements (grams, liters, °C) unless the video specifies otherwise\n\n" +
+    "- Each question must cover a distinct, specific point from the video.\n" +
+    "- Questions must be clear, concise, and unambiguous.\n" +
+    "- Base questions ONLY on what is shown or said in the video.\n" +
+    "- Avoid redundancy between questions.\n" +
+    "- Correct answers must be specific and directly verifiable from the video.\n" +
+    "- Provide a clear, pedagogical explanation of why the correct answer is correct.\n" +
+    "- Include the exact timestamp (in seconds) where the relevant content appears.\n" +
+    "- Preserve any units, terms, or notation exactly as used in the video.\n\n" +
     "TIMESTAMP AND CORRECT REASON FORMAT:\n" +
-    "- Provide the timestamp in SECONDS (e.g., 45 for 0:45, 135 for 2:15, 90 for 1:30)\n" +
-    "- The timestamp should point to where the content is mentioned in the video\n" +
-    '- In the correctReason, start with a reference to the time (e.g., "At 2:15" or "At 0:45")\n' +
-    "- Follow with a clear pedagogical explanation\n" +
-    "- Example timestamp: 135 (for 2 minutes 15 seconds)\n" +
-    '- Example correctReason: "At 2:15, the instructor demonstrates that preheating to 175°C ensures even baking and proper rise of the cake."\n\n' +
-    "EXAMPLES:\n\n" +
-    "Example 1 - INSTRUCTIONAL (Food Label Reading):\n" +
+    "- Provide the timestamp in SECONDS (e.g., 45 for 0:45, 135 for 2:15, 90 for 1:30).\n" +
+    "- The timestamp should point to where the content appears in the video.\n" +
+    '- In the correctReason, start with a reference to the time (e.g., "At 2:15" or "At 0:45").\n' +
+    "- Follow with a clear pedagogical explanation.\n" +
+    "- Example timestamp: 135 (for 2 minutes 15 seconds).\n" +
+    '- Example correctReason: "At 1:20, the video shows that each period\'s interest is added to the balance, so future interest is calculated on a larger amount."\n\n' +
+    "EXAMPLES (across different kinds of videos):\n\n" +
+    "Example 1 - CONCEPTUAL (finance explainer):\n" +
     "{\n" +
-    '  "question": "What is the first section you should identify on a food label?",\n' +
-    '  "correctAnswer": "The nutrition facts panel",\n' +
-    '  "correctReason": "At 0:45, the video explains that the nutrition facts panel is the primary source of nutritional information and is legally required to be prominently displayed, making it the starting point for label reading.",\n' +
-    '  "timestamp": 45\n' +
+    '  "question": "Why does compound interest grow faster over time than simple interest?",\n' +
+    '  "correctAnswer": "Because interest is earned on previously accumulated interest, not just the original principal",\n' +
+    '  "correctReason": "At 1:20, the video shows that each period\'s interest is added to the balance, so future interest is calculated on a larger amount.",\n' +
+    '  "timestamp": 80\n' +
     "}\n" +
-    'NOT: "What type of meat was shown in the example?" (this focuses on the example, not the skill)\n\n' +
-    "Example 2 - ACTUAL PROCEDURE (Chocolate Cake):\n" +
+    'NOT: "What starting amount was used in the example?" (focuses on the illustrative example, not the concept)\n\n' +
+    "Example 2 - PROCEDURAL (software tutorial):\n" +
     "{\n" +
-    '  "question": "What temperature should the oven be preheated to?",\n' +
-    '  "correctAnswer": "175°C",\n' +
-    '  "correctReason": "At 2:15, the instructor specifies that preheating to 175°C ensures even baking and proper rise of the cake.",\n' +
-    '  "timestamp": 135\n' +
+    '  "question": "Which command creates a new branch and switches to it in one step?",\n' +
+    '  "correctAnswer": "git checkout -b <branch-name>",\n' +
+    '  "correctReason": "At 3:05, the presenter runs `git checkout -b feature` to create the branch and switch to it at once.",\n' +
+    '  "timestamp": 185\n' +
     "}\n\n" +
-    "Example 3 - INSTRUCTIONAL (Safety Symbols):\n" +
+    "Example 3 - CONCEPTUAL (science lesson):\n" +
     "{\n" +
-    '  "question": "How do you identify a high-risk hazard symbol?",\n' +
-    '  "correctAnswer": "By the red color and triangle shape",\n' +
-    '  "correctReason": "At 1:30, the training material shows that high-risk hazard symbols use red triangles as a universal warning indicator to ensure immediate visual recognition of dangerous situations.",\n' +
-    '  "timestamp": 90\n' +
+    '  "question": "What is the main role of chlorophyll in photosynthesis?",\n' +
+    '  "correctAnswer": "Absorbing light energy to drive the reaction",\n' +
+    '  "correctReason": "At 0:50, the narrator explains that chlorophyll captures light energy, which powers the conversion of CO2 and water into glucose.",\n' +
+    '  "timestamp": 50\n' +
     "}\n" +
-    'NOT: "What chemical was shown in the example sign?" (this focuses on the example, not the skill)\n\n' +
-    "Example 4 - ACTUAL PROCEDURE (Equipment Cleaning):\n" +
+    'NOT: "What color was the leaf in the diagram?" (focuses on an incidental detail, not the concept)\n\n' +
+    "Example 4 - PROCEDURAL (cooking demo):\n" +
     "{\n" +
-    '  "question": "What is the first step before starting the cleaning procedure?",\n' +
-    '  "correctAnswer": "Disconnect the equipment from the power source",\n' +
-    '  "correctReason": "At 0:30, the safety protocol emphasizes that disconnecting power is essential for worker safety to prevent electrical shock or accidental equipment activation during cleaning.",\n' +
-    '  "timestamp": 30\n' +
+    '  "question": "What should you do to the pan before adding the eggs?",\n' +
+    '  "correctAnswer": "Heat it and coat it with a thin layer of butter",\n' +
+    '  "correctReason": "At 2:15, the cook heats the pan and adds butter so the eggs do not stick.",\n' +
+    '  "timestamp": 135\n' +
     "}";
 
   return { system, user: withLanguageNote(user) };
@@ -167,27 +168,27 @@ export function buildDistractorsPrompt(
     "- Use common misconceptions or typical mistakes\n" +
     "- Maintain similar length and structure to the correct answer\n" +
     "- Consider the context and reasoning provided for the correct answer\n" +
-    "- Use metric system for measurements (grams, liters, °C) unless specified otherwise\n" +
+    "- Preserve any units, terms, or notation exactly as used in the correct answer\n" +
     "- Ensure each false option is clearly distinguishable from the correct one\n\n" +
-    "EXAMPLES:\n\n" +
-    "Example 1:\n" +
-    'Question: "What temperature should the oven be preheated to?"\n' +
-    'Correct: "175°C"\n' +
-    'Why correct: "At 02:15, the instructor specifies that preheating to 175°C ensures even baking and proper rise of the cake."\n' +
-    'False options: ["150°C", "200°C", "225°C"]\n' +
-    "Explanation: These are clearly different temperatures, not subtle variations like 170°C or 180°C which could be ambiguous.\n\n" +
-    "Example 2:\n" +
-    'Question: "How long should hands be washed with soap?"\n' +
-    'Correct: "At least 20 seconds"\n' +
-    'Why correct: "At 01:10, the hygiene protocol states that 20 seconds is the minimum time needed to effectively remove contaminants."\n' +
-    'False options: ["At least 5 seconds", "At least 40 seconds", "At least 60 seconds"]\n' +
-    "Explanation: Significantly different durations that are clearly wrong (too short or unnecessarily long), not close variations like 15 or 25 seconds.\n\n" +
-    "Example 3:\n" +
-    'Question: "What is the first step before cleaning equipment?"\n' +
-    'Correct: "Disconnect from power source"\n' +
-    'Why correct: "At 00:30, the safety protocol emphasizes that disconnecting power is essential for worker safety to prevent electrical shock."\n' +
-    'False options: ["Apply cleaning solution", "Remove loose debris with a brush", "Drain all liquids from the system"]\n' +
-    "Explanation: These are clearly different actions that come at other stages, not subtle variations of disconnecting power.";
+    "EXAMPLES (across different kinds of videos):\n\n" +
+    "Example 1 (a numeric value):\n" +
+    'Question: "According to the video, what is the minimum recommended password length?"\n' +
+    'Correct: "12 characters"\n' +
+    'Why correct: "At 1:40, the presenter recommends at least 12 characters for a strong password."\n' +
+    'False options: ["4 characters", "6 characters", "8 characters"]\n' +
+    "Explanation: Clearly different values that are wrong relative to the stated minimum, not close variations like 11 or 13.\n\n" +
+    "Example 2 (a software command):\n" +
+    'Question: "Which command creates a new branch and switches to it?"\n' +
+    'Correct: "git checkout -b feature"\n' +
+    'Why correct: "At 3:05, the presenter uses git checkout -b to create and switch in one step."\n' +
+    'False options: ["git branch -d feature", "git merge feature", "git clone feature"]\n' +
+    "Explanation: Real Git commands that do clearly different things (delete, merge, clone), so none is 'also correct'.\n\n" +
+    "Example 3 (a concept):\n" +
+    'Question: "What is the main role of chlorophyll in photosynthesis?"\n' +
+    'Correct: "Absorbing light energy"\n' +
+    'Why correct: "At 0:50, the narrator explains chlorophyll captures the light energy that powers the reaction."\n' +
+    'False options: ["Releasing oxygen into the air", "Storing glucose in the leaf", "Transporting water from the roots"]\n' +
+    "Explanation: Real parts of plant biology, but not chlorophyll's role — clearly different concepts, not subtle variations.";
 
   return { system, user: withLanguageNote(user) };
 }
@@ -208,7 +209,7 @@ export const distractorsResponseSchema: Schema = {
 export function buildDocsPrompt(): PromptPair {
   const system =
     "You are an expert technical writer and instructional designer. " +
-    "Your specialty is turning procedural and instructional videos into thorough, well-organized reference documentation.";
+    "You turn explainer videos on any topic — tutorials, lessons, demos, walkthroughs — into thorough, well-organized reference documentation.";
 
   const user =
     "Generate thorough Markdown documentation of the provided video's content.\n\n" +
@@ -216,9 +217,9 @@ export function buildDocsPrompt(): PromptPair {
     "- Start with a short Overview section summarizing the purpose and scope of the video.\n" +
     "- Break the rest of the content into clearly titled sections using Markdown headings (##).\n" +
     "- Reference where in the video each key point appears using a `[mm:ss]` timestamp marker.\n" +
-    "- Where the video demonstrates a procedure, present it as a numbered step-by-step list, with each step carrying its own `[mm:ss]` timestamp.\n" +
-    "- Capture specific, verifiable details: measurements, temperatures, durations, tools, materials, and any safety warnings mentioned.\n" +
-    "- Use metric system for measurements (grams, liters, °C) unless the video specifies otherwise.\n" +
+    "- Where the video demonstrates a step-by-step process, present it as a numbered list, with each step carrying its own `[mm:ss]` timestamp.\n" +
+    "- Capture specific, verifiable details: key facts, values, definitions, terms, examples, and any warnings or caveats mentioned.\n" +
+    "- Preserve units, terms, and notation exactly as used in the video.\n" +
     "- Base the documentation ONLY on what is shown or said in the video — do not invent content that is not present.\n" +
     "- Use proper Markdown formatting (headings, bullet lists, numbered lists, bold for key terms) so the output renders cleanly.\n\n" +
     "Respond with the documentation content only, as a single Markdown string.";

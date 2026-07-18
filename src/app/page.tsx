@@ -41,11 +41,13 @@ export default function Home() {
               <div className="flex flex-1 flex-col justify-center py-16">
                 <div className="mb-10 flex flex-col gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">
-                    Turn a screen recording into training material
+                    Turn any explainer video into training material
                   </h1>
                   <p className="text-sm text-muted-foreground">
-                    Upload a video walkthrough and Gemini will write the
-                    documentation and build a quiz to go with it.
+                    Upload a video &mdash; a walkthrough, a lesson, a demo,
+                    anything explained on camera &mdash; and Gemini will write
+                    the documentation and build a 20-question quiz to go with
+                    it.
                   </p>
                 </div>
                 <VideoPicker

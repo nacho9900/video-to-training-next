@@ -96,7 +96,8 @@ export function VideoPicker({ models, onSubmit }: VideoPickerProps) {
                 Drop a video here, or click to browse
               </p>
               <p className="text-xs text-muted-foreground">
-                MP4, MOV, WebM &mdash; whatever your camera exports
+                MP4, MOV, WebM &mdash; any topic, from a quick tip to a deep
+                dive
               </p>
             </div>
           </>

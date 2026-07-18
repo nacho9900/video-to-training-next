@@ -1,8 +1,9 @@
 # Video to Training
 
-Turn a screen recording into training material. Upload a video and Google
-Gemini analyzes it, writes documentation, and builds a 20-question
-multiple-choice quiz from what actually happens on screen.
+Turn any explainer video into training material. Upload a video — a tutorial,
+a lesson, a demo, a walkthrough — and Google Gemini analyzes it, writes
+documentation, and builds a 20-question multiple-choice quiz from what's
+actually taught in it.
 
 Built with **Next.js 16** (App Router), **shadcn/ui**, and the
 **Google Gemini API**.
