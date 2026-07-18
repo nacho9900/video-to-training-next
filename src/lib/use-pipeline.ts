@@ -89,6 +89,8 @@ export interface UsePipelineReturn {
   videoUrl: string | null;
   /** Generated documentation markdown, null until it's ready. */
   markdown: string | null;
+  /** True if documentation generation failed (the training still completes). */
+  docsFailed: boolean;
   /** Questions as they're built; each `options` is null until generated. */
   questions: BuildingQuestion[];
   run: (file: File, model: string, numberOfQuestions: number) => Promise<void>;
@@ -101,20 +103,34 @@ export function usePipeline(): UsePipelineReturn {
   const [progress, setProgress] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [markdown, setMarkdown] = useState<string | null>(null);
+  const [docsFailed, setDocsFailed] = useState(false);
   const [questions, setQuestions] = useState<BuildingQuestion[]>([]);
   const [error, setError] = useState<PipelineError | null>(null);
   const runIdRef = useRef(0);
+  // Object URL for the locally-selected file — we show the video straight from
+  // the user's own file (not the uploaded blob), which always plays and avoids
+  // any storage/serving quirks. Tracked here so we can revoke it.
+  const objectUrlRef = useRef<string | null>(null);
+
+  const revokeObjectUrl = useCallback(() => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+  }, []);
 
   const reset = useCallback(() => {
     // Bumping the run id makes any in-flight run's late updates no-ops.
     runIdRef.current += 1;
+    revokeObjectUrl();
     setStage("idle");
     setProgress(0);
     setVideoUrl(null);
     setMarkdown(null);
+    setDocsFailed(false);
     setQuestions([]);
     setError(null);
-  }, []);
+  }, [revokeObjectUrl]);
 
   const run = useCallback(
     async (file: File, model: string, numberOfQuestions: number) => {
@@ -123,9 +139,16 @@ export function usePipeline(): UsePipelineReturn {
 
       setError(null);
       setMarkdown(null);
+      setDocsFailed(false);
       setQuestions([]);
-      setVideoUrl(null);
       setProgress(0);
+
+      // Show the video straight from the user's local file — always plays and
+      // is available instantly.
+      revokeObjectUrl();
+      const objectUrl = URL.createObjectURL(file);
+      objectUrlRef.current = objectUrl;
+      setVideoUrl(objectUrl);
 
       // Tracks the stage currently executing so a failure can report where it
       // happened, even after the stage state is reset back to "idle".
@@ -136,13 +159,12 @@ export function usePipeline(): UsePipelineReturn {
       };
 
       try {
-        // 1. Upload the raw video straight to Vercel Blob.
+        // 1. Upload the raw video straight to Vercel Blob (for Gemini to read).
         goto("uploading");
         const blobUrl = await uploadVideoToBlob(file, (pct) => {
           if (isCurrent()) setProgress(pct);
         });
         if (!isCurrent()) return;
-        setVideoUrl(blobUrl);
 
         // 2. Hand the blob to Gemini's Files API.
         goto("gemini_upload");
@@ -157,26 +179,29 @@ export function usePipeline(): UsePipelineReturn {
         await pollUntilActive(fileName, isCurrent);
         if (!isCurrent()) return;
 
-        // 4. Docs and questions only need `fileName`, so we fetch them
-        // concurrently but reveal them in order: documentation first, then the
-        // question texts.
+        // 4. Documentation is the slowest single call (it produces a lot of
+        // text), so we DON'T block on it — it reveals itself whenever it's
+        // ready while questions and answers stream in parallel. Docs are
+        // secondary (collapsed), so a docs failure doesn't fail the training.
         goto("generating_docs");
         const docsPromise = postJson<DocsResponse>("/api/generate/docs", {
           fileName,
           model,
-        } satisfies DocsRequest);
-        const questionsPromise = postJson<QuestionsResponse>(
+        } satisfies DocsRequest)
+          .then((res) => {
+            if (isCurrent()) setMarkdown(res.markdown);
+          })
+          .catch(() => {
+            if (isCurrent()) setDocsFailed(true);
+          });
+
+        // 5. Reveal the question texts as soon as they're ready (answers still
+        // pending), without waiting for docs.
+        goto("generating_questions");
+        const questionsRes = await postJson<QuestionsResponse>(
           "/api/generate/questions",
           { fileName, model, numberOfQuestions } satisfies QuestionsRequest,
         );
-
-        const docsRes = await docsPromise;
-        if (!isCurrent()) return;
-        setMarkdown(docsRes.markdown);
-
-        // 5. Reveal the question texts (answers still pending).
-        goto("generating_questions");
-        const questionsRes = await questionsPromise;
         if (!isCurrent()) return;
         const cores = questionsRes.questions;
         setQuestions(
@@ -209,6 +234,10 @@ export function usePipeline(): UsePipelineReturn {
           );
         }
 
+        // Make sure the (decoupled) docs request has settled before we call
+        // the whole run done.
+        await docsPromise;
+        if (!isCurrent()) return;
         goto("done");
       } catch (err) {
         if (!isCurrent()) return;
@@ -218,8 +247,18 @@ export function usePipeline(): UsePipelineReturn {
         setStage("idle");
       }
     },
-    [],
+    [revokeObjectUrl],
   );
 
-  return { stage, progress, videoUrl, markdown, questions, run, reset, error };
+  return {
+    stage,
+    progress,
+    videoUrl,
+    markdown,
+    docsFailed,
+    questions,
+    run,
+    reset,
+    error,
+  };
 }

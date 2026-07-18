@@ -29,6 +29,7 @@ interface TrainingViewProps {
   stage: PipelineStage;
   videoUrl: string | null;
   markdown: string | null;
+  docsFailed: boolean;
   questions: BuildingQuestion[];
   onReset: () => void;
 }
@@ -233,6 +234,7 @@ export function TrainingView({
   stage,
   videoUrl,
   markdown,
+  docsFailed,
   questions,
   onReset,
 }: TrainingViewProps) {
@@ -302,6 +304,10 @@ export function TrainingView({
             </Card>
           </Collapsible>
         </Reveal>
+      ) : docsFailed ? (
+        <p className="text-sm text-muted-foreground">
+          Documentation couldn&apos;t be generated for this video.
+        </p>
       ) : (
         <PendingRow label="Writing documentation" />
       )}

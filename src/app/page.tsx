@@ -10,8 +10,17 @@ import { usePipeline } from "@/lib/use-pipeline";
 const PREPARING_STAGES = ["uploading", "gemini_upload", "processing"] as const;
 
 export default function Home() {
-  const { stage, progress, videoUrl, markdown, questions, run, reset, error } =
-    usePipeline();
+  const {
+    stage,
+    progress,
+    videoUrl,
+    markdown,
+    docsFailed,
+    questions,
+    run,
+    reset,
+    error,
+  } = usePipeline();
 
   const isPreparing = (PREPARING_STAGES as readonly string[]).includes(stage);
   const isBuilding =
@@ -39,6 +48,7 @@ export default function Home() {
                   stage={stage}
                   videoUrl={videoUrl}
                   markdown={markdown}
+                  docsFailed={docsFailed}
                   questions={questions}
                   onReset={reset}
                 />
