@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { NUMBER_OF_QUESTIONS } from "@/lib/constants";
+import { clampQuestionCount } from "@/lib/constants";
 import {
   assertModelEnabled,
   hasGeminiKey,
@@ -37,7 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertModelEnabled(parsed.model);
 
-    const { system, user } = buildQuestionsPrompt(NUMBER_OF_QUESTIONS);
+    const { system, user } = buildQuestionsPrompt(parsed.numberOfQuestions);
     const result = await generateJson<unknown>({
       model: parsed.model,
       systemInstruction: system,
@@ -70,7 +70,8 @@ function parseQuestionsRequest(payload: unknown): QuestionsRequest | null {
   if (typeof record.model !== "string" || !record.model.trim()) {
     return null;
   }
-  return { fileName: record.fileName, model: record.model };
+  const numberOfQuestions = clampQuestionCount(Number(record.numberOfQuestions));
+  return { fileName: record.fileName, model: record.model, numberOfQuestions };
 }
 
 function errorResponse(message: string, status: number): NextResponse<ApiError> {

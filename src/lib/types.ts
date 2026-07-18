@@ -71,6 +71,7 @@ export interface DocsResponse {
 export interface QuestionsRequest {
   fileName: string;
   model: string;
+  numberOfQuestions: number;
 }
 export interface QuestionsResponse {
   questions: QuestionCore[];

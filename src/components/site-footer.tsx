@@ -41,7 +41,7 @@ export function SiteFooter() {
     <footer className="border-t">
       <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-4 px-6 py-5">
         <p className="text-xs text-muted-foreground">
-          Built by Ignacio Negro
+          Built by Nacho Negro Caino
         </p>
         <nav className="flex items-center gap-1">
           {links.map((link) => (

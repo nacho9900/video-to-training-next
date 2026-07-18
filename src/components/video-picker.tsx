@@ -3,14 +3,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FileVideo, Sparkles, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { ModelSelect, pickDefaultModelId } from "@/components/model-select";
 import type { ModelInfo } from "@/lib/models";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
+import {
+  DEFAULT_NUMBER_OF_QUESTIONS,
+  MAX_QUESTIONS,
+  MIN_QUESTIONS,
+  QUESTIONS_STEP,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 interface VideoPickerProps {
   models: ModelInfo[];
-  onSubmit: (file: File, model: string) => void;
+  onSubmit: (file: File, model: string, numberOfQuestions: number) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -30,6 +38,9 @@ export function VideoPicker({ models, onSubmit }: VideoPickerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [model, setModel] = useState(() =>
     pickDefaultModelId(models, DEFAULT_MODEL_ID),
+  );
+  const [numberOfQuestions, setNumberOfQuestions] = useState(
+    DEFAULT_NUMBER_OF_QUESTIONS,
   );
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -139,10 +150,30 @@ export function VideoPicker({ models, onSubmit }: VideoPickerProps) {
 
       <ModelSelect models={models} value={model} onChange={setModel} />
 
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="question-count">Questions</Label>
+          <span className="text-sm font-medium tabular-nums text-muted-foreground">
+            {numberOfQuestions}
+          </span>
+        </div>
+        <Slider
+          id="question-count"
+          min={MIN_QUESTIONS}
+          max={MAX_QUESTIONS}
+          step={QUESTIONS_STEP}
+          value={[numberOfQuestions]}
+          onValueChange={(value) =>
+            setNumberOfQuestions(Array.isArray(value) ? value[0] : value)
+          }
+          aria-label="Number of questions"
+        />
+      </div>
+
       <Button
         size="lg"
         disabled={!file}
-        onClick={() => file && onSubmit(file, model)}
+        onClick={() => file && onSubmit(file, model, numberOfQuestions)}
         className="w-full"
       >
         <Sparkles />

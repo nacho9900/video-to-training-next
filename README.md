@@ -2,8 +2,8 @@
 
 Turn any explainer video into training material. Upload a video — a tutorial,
 a lesson, a demo, a walkthrough — and Google Gemini analyzes it, writes
-documentation, and builds a 20-question multiple-choice quiz from what's
-actually taught in it.
+documentation, and builds a multiple-choice quiz (10 questions by default,
+adjustable) from what's actually taught in it.
 
 Built with **Next.js 16** (App Router), **shadcn/ui**, and the
 **Google Gemini API**.
@@ -19,8 +19,9 @@ Built with **Next.js 16** (App Router), **shadcn/ui**, and the
    isn't limited by the serverless request body size).
 3. The server hands the video to the **Gemini Files API** and waits for it to
    be processed.
-4. Gemini writes **documentation** and a set of **20 questions with correct
-   answers, explanations, and video timestamps**.
+4. Gemini writes **documentation** and a set of **questions with correct
+   answers, explanations, and video timestamps** (you choose how many —
+   5 to 20, in steps of 5; 10 by default).
 5. For each question, plausible-but-wrong **distractors** are generated, and
    the options are shuffled.
 6. You get the video back with collapsible documentation and the full quiz.
@@ -94,8 +95,8 @@ rejected by the API, so the restriction can't be bypassed from the client.
 
 Vercel Functions have a fixed maximum duration (300s on Hobby; up to 800s on
 Pro). Uploading a long video, waiting for Gemini to ingest it, and generating
-documentation + 20 questions + 60 distractors can easily exceed that in a
-single request.
+documentation + up to 20 questions + their distractors can easily exceed that
+in a single request.
 
 Since a Gemini-uploaded file persists (~48h) and is addressable by name, the
 video is uploaded once and every later step references it by name. The client
@@ -116,7 +117,7 @@ src/
       gemini/upload/      # blob URL -> Gemini Files API
       gemini/status/      # poll processing state
       generate/docs/      # documentation from the video
-      generate/questions/ # 20 questions + correct answers
+      generate/questions/ # N questions + correct answers
       generate/options/   # distractors + shuffled options
     page.tsx              # composes gate -> picker -> processing -> quiz
   components/             # UI (gate, model select, picker, stepper, quiz)

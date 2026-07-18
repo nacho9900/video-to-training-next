@@ -93,7 +93,7 @@ export interface UsePipelineReturn {
   stage: PipelineStage;
   /** Upload percentage (0-100), only meaningful while stage === "uploading". */
   progress: number;
-  run: (file: File, model: string) => Promise<void>;
+  run: (file: File, model: string, numberOfQuestions: number) => Promise<void>;
   reset: () => void;
   result: PipelineResult | null;
   error: string | null;
@@ -115,7 +115,7 @@ export function usePipeline(): UsePipelineReturn {
     setError(null);
   }, []);
 
-  const run = useCallback(async (file: File, model: string) => {
+  const run = useCallback(async (file: File, model: string, numberOfQuestions: number) => {
     const runId = ++runIdRef.current;
     const isCurrent = () => runIdRef.current === runId;
 
@@ -154,7 +154,7 @@ export function usePipeline(): UsePipelineReturn {
       } satisfies DocsRequest);
       const questionsPromise = postJson<QuestionsResponse>(
         "/api/generate/questions",
-        { fileName, model } satisfies QuestionsRequest,
+        { fileName, model, numberOfQuestions } satisfies QuestionsRequest,
       );
 
       const questionsRes = await questionsPromise;

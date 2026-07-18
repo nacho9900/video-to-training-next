@@ -46,13 +46,12 @@ export default function Home() {
                   <p className="text-sm text-muted-foreground">
                     Upload a video &mdash; a walkthrough, a lesson, a demo,
                     anything explained on camera &mdash; and Gemini will write
-                    the documentation and build a 20-question quiz to go with
-                    it.
+                    the documentation and build a quiz to go with it.
                   </p>
                 </div>
                 <VideoPicker
                   models={models}
-                  onSubmit={(file, model) => run(file, model)}
+                  onSubmit={(file, model, count) => run(file, model, count)}
                 />
               </div>
             );
