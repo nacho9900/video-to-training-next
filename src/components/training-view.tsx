@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import {
   ChevronDown,
   CircleCheck,
+  ExternalLink,
   FileText,
   Loader2,
   RotateCcw,
@@ -236,6 +237,7 @@ export function TrainingView({
   onReset,
 }: TrainingViewProps) {
   const [docsOpen, setDocsOpen] = useState(false);
+  const [videoBroken, setVideoBroken] = useState(false);
 
   const answered = questions.filter((q) => q.options).length;
   const total = questions.length;
@@ -245,11 +247,32 @@ export function TrainingView({
     <div className="flex w-full flex-col gap-8 py-10">
       {videoUrl && (
         <Reveal>
-          <video
-            src={videoUrl}
-            controls
-            className="w-full rounded-xl bg-black shadow-sm"
-          />
+          {videoBroken ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border bg-muted/30 px-6 py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                This video format can&apos;t be previewed inline in your
+                browser.
+              </p>
+              <a
+                href={videoUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4"
+              >
+                <ExternalLink className="size-3.5" />
+                Open the video in a new tab
+              </a>
+            </div>
+          ) : (
+            <video
+              src={videoUrl}
+              controls
+              playsInline
+              preload="metadata"
+              onError={() => setVideoBroken(true)}
+              className="w-full rounded-xl bg-black shadow-sm"
+            />
+          )}
         </Reveal>
       )}
 
@@ -315,8 +338,8 @@ export function TrainingView({
           </div>
 
           <div className="flex flex-col gap-4">
-            {questions.map((q) => (
-              <Reveal key={q.order}>
+            {questions.map((q, idx) => (
+              <Reveal key={q.order} delayMs={Math.min(idx, 8) * 70}>
                 <QuestionCard question={q} />
               </Reveal>
             ))}
