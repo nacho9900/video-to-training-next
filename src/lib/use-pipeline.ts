@@ -4,7 +4,6 @@
 // exposing a single `stage` value the UI can render as a stepper.
 
 import { useCallback, useRef, useState } from "react";
-import { toast } from "sonner";
 import { uploadVideoToBlob } from "./upload-video";
 import type {
   ApiError,
@@ -25,6 +24,12 @@ export interface PipelineResult {
   videoUrl: string;
   markdown: string;
   questions: GeneratedQuestion[];
+}
+
+export interface PipelineError {
+  message: string;
+  /** The stage that was running when the failure happened. */
+  step: StageId;
 }
 
 export type PipelineStage = StageId | "idle";
@@ -96,14 +101,14 @@ export interface UsePipelineReturn {
   run: (file: File, model: string, numberOfQuestions: number) => Promise<void>;
   reset: () => void;
   result: PipelineResult | null;
-  error: string | null;
+  error: PipelineError | null;
 }
 
 export function usePipeline(): UsePipelineReturn {
   const [stage, setStage] = useState<PipelineStage>("idle");
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<PipelineResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<PipelineError | null>(null);
   const runIdRef = useRef(0);
 
   const reset = useCallback(() => {
@@ -123,16 +128,24 @@ export function usePipeline(): UsePipelineReturn {
     setResult(null);
     setProgress(0);
 
+    // Tracks the stage currently executing so a failure can report where it
+    // happened, even after the stage state is reset back to "idle".
+    let activeStep: StageId = "uploading";
+    const goto = (step: StageId) => {
+      activeStep = step;
+      setStage(step);
+    };
+
     try {
       // 1. Upload the raw video straight to Vercel Blob.
-      setStage("uploading");
+      goto("uploading");
       const blobUrl = await uploadVideoToBlob(file, (pct) => {
         if (isCurrent()) setProgress(pct);
       });
       if (!isCurrent()) return;
 
       // 2. Hand the blob to Gemini's Files API.
-      setStage("gemini_upload");
+      goto("gemini_upload");
       const { fileName } = await postJson<UploadResponse>(
         "/api/gemini/upload",
         { blobUrl } satisfies UploadRequest,
@@ -140,14 +153,14 @@ export function usePipeline(): UsePipelineReturn {
       if (!isCurrent()) return;
 
       // 3. Wait for Gemini to finish ingesting the file.
-      setStage("processing");
+      goto("processing");
       await pollUntilActive(fileName, isCurrent);
       if (!isCurrent()) return;
 
       // 4 & 5. Docs and question-writing both only need `fileName`, so they
       // run concurrently; we still advance the stage monotonically so the
       // stepper reads top-to-bottom.
-      setStage("generating_docs");
+      goto("generating_docs");
       const docsPromise = postJson<DocsResponse>("/api/generate/docs", {
         fileName,
         model,
@@ -159,11 +172,11 @@ export function usePipeline(): UsePipelineReturn {
 
       const questionsRes = await questionsPromise;
       if (!isCurrent()) return;
-      setStage("generating_questions");
+      goto("generating_questions");
 
       // 6. Build multiple-choice options for every question, chunked and
       // fired in parallel to stay well under any serverless timeout.
-      setStage("generating_options");
+      goto("generating_options");
       const batches = chunk(questionsRes.questions, OPTIONS_CHUNK_SIZE);
       const optionsResults = await Promise.all(
         batches.map((batch, idx) =>
@@ -185,15 +198,14 @@ export function usePipeline(): UsePipelineReturn {
       const { markdown } = await docsPromise;
       if (!isCurrent()) return;
 
-      setStage("done");
+      goto("done");
       setResult({ videoUrl: blobUrl, markdown, questions });
     } catch (err) {
       if (!isCurrent()) return;
       const message =
         err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
+      setError({ message, step: activeStep });
       setStage("idle");
-      toast.error(message);
     }
   }, []);
 

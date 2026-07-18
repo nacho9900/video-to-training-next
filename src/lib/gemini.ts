@@ -1,11 +1,8 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
-
 import {
   type Content,
   createPartFromUri,
-  type File as GeminiFile,
   FileState,
   type GenerateContentConfig,
   GoogleGenAI,
@@ -43,39 +40,6 @@ function mapFileState(state: FileState | undefined): GeminiFileState {
   }
 }
 
-function isNotFoundError(error: unknown): boolean {
-  if (typeof error !== "object" || error === null) {
-    return false;
-  }
-  const record = error as Record<string, unknown>;
-  return record.code === 404 || record.status === 404;
-}
-
-async function getFileByName(
-  ai: GoogleGenAI,
-  name: string,
-): Promise<GeminiFile | null> {
-  try {
-    return await ai.files.get({ name });
-  } catch (error: unknown) {
-    if (isNotFoundError(error)) {
-      return null;
-    }
-    throw error;
-  }
-}
-
-/**
- * Derives a stable Gemini file name from the blob URL so repeated uploads of
- * the same video are deduplicated instead of re-uploaded.
- * Gemini file ids must match lowercase alphanumeric/dash, <=40 chars, and
- * cannot start or end with a dash.
- */
-function buildDedupFileName(blobUrl: string): string {
-  const hash = createHash("sha256").update(blobUrl).digest("hex").slice(0, 32);
-  return `files/vtt-${hash}`;
-}
-
 export interface UploadedGeminiFile {
   fileName: string;
   mimeType: string;
@@ -84,8 +48,9 @@ export interface UploadedGeminiFile {
 
 /**
  * Fetches the video from the given blob URL and uploads it to the Gemini
- * Files API, reusing an existing upload when one is found under the stable
- * dedup name. Does not wait for the file to become ACTIVE.
+ * Files API, letting Gemini assign the file name. The returned `fileName` is
+ * the canonical resource name every later step references. Does not wait for
+ * the file to become ACTIVE.
  */
 export async function uploadVideoFromUrl(
   blobUrl: string,
@@ -101,21 +66,7 @@ export async function uploadVideoFromUrl(
   const mimeType = response.headers.get("content-type") ?? "video/mp4";
   const blob = await response.blob();
 
-  const dedupName = buildDedupFileName(blobUrl);
-
-  let file = await getFileByName(ai, dedupName);
-  if (!file) {
-    try {
-      file = await ai.files.upload({
-        file: blob,
-        config: { name: dedupName, mimeType },
-      });
-    } catch {
-      // The chosen name may collide with an unrelated file (or be rejected
-      // for some other reason) — fall back to letting Gemini auto-name it.
-      file = await ai.files.upload({ file: blob, config: { mimeType } });
-    }
-  }
+  const file = await ai.files.upload({ file: blob, config: { mimeType } });
 
   if (!file.name) {
     throw new Error("Gemini file upload did not return a file name");

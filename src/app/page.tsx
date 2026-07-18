@@ -4,10 +4,11 @@ import { ApiKeyGate } from "@/components/api-key-gate";
 import { VideoPicker } from "@/components/video-picker";
 import { ProcessingView } from "@/components/processing-view";
 import { QuizView } from "@/components/quiz-view";
+import { ErrorAlert } from "@/components/error-alert";
 import { usePipeline } from "@/lib/use-pipeline";
 
 export default function Home() {
-  const { stage, progress, run, reset, result } = usePipeline();
+  const { stage, progress, run, reset, result, error } = usePipeline();
 
   return (
     <div className="flex flex-1 flex-col bg-background">
@@ -39,6 +40,7 @@ export default function Home() {
 
             return (
               <div className="flex flex-1 flex-col justify-center py-16">
+                {error && <ErrorAlert error={error} />}
                 <div className="mb-10 flex flex-col gap-2">
                   <h1 className="text-2xl font-semibold tracking-tight">
                     Turn any explainer video into training material

@@ -3,6 +3,7 @@
 import { Check, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import type { StageId } from "@/lib/types";
+import { STAGE_LABELS } from "@/lib/stages";
 import type { PipelineStage } from "@/lib/use-pipeline";
 import { cn } from "@/lib/utils";
 
@@ -13,16 +14,16 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { id: "uploading", label: "Uploading video" },
-  { id: "gemini_upload", label: "Uploading to Gemini" },
+  { id: "uploading", label: STAGE_LABELS.uploading },
+  { id: "gemini_upload", label: STAGE_LABELS.gemini_upload },
   {
     id: "processing",
-    label: "Gemini is processing the video",
+    label: STAGE_LABELS.processing,
     note: "This can take a little while for longer videos.",
   },
-  { id: "generating_docs", label: "Writing documentation" },
-  { id: "generating_questions", label: "Generating questions" },
-  { id: "generating_options", label: "Building answer options" },
+  { id: "generating_docs", label: STAGE_LABELS.generating_docs },
+  { id: "generating_questions", label: STAGE_LABELS.generating_questions },
+  { id: "generating_options", label: STAGE_LABELS.generating_options },
 ];
 
 function stepStatus(
