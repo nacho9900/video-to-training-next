@@ -80,8 +80,11 @@ rejected by the API, so the restriction can't be bypassed from the client.
 ## Deploying to Vercel
 
 1. Import the repo into Vercel.
-2. Add a **Blob store** (Storage → Create → Blob) and link it to the project —
-   this sets `BLOB_READ_WRITE_TOKEN` automatically.
+2. Add a **Blob store** (Storage → Create → Blob) and link it to the project.
+   Linking creates `BLOB_READ_WRITE_TOKEN`, `BLOB_STORE_ID`, and
+   `BLOB_WEBHOOK_PUBLIC_KEY` — this app only uses **`BLOB_READ_WRITE_TOKEN`**
+   (the SDK reads it automatically); the other two are created but unused, so
+   you can leave them as-is.
 3. Set `GEMINI_API_KEY` (and optionally `DISABLED_MODELS`) in the project's
    environment variables.
 4. Deploy.
