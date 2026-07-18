@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { FALSE_OPTIONS_PER_QUESTION } from "@/lib/constants";
-import {
-  assertModelEnabled,
-  hasGeminiKey,
-  ModelNotAllowedError,
-} from "@/lib/env.server";
+import { hasGeminiKey } from "@/lib/env.server";
 import { generateJson } from "@/lib/gemini";
+import { DISTRACTORS_MODEL_ID } from "@/lib/models";
 import {
   buildDistractorsPrompt,
   distractorsResponseSchema,
@@ -36,10 +33,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = parseOptionsRequest(payload);
   if (!parsed) {
-    return errorResponse(
-      "`model` and a non-empty `questions` array are required",
-      400,
-    );
+    return errorResponse("A valid `question` and `order` are required", 400);
   }
 
   if (!hasGeminiKey()) {
@@ -47,16 +41,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    assertModelEnabled(parsed.model);
-
-    const startOrder = parsed.startOrder ?? 1;
-    const questions = await Promise.all(
-      parsed.questions.map((question, index) =>
-        buildGeneratedQuestion(question, parsed.model, startOrder + index),
-      ),
-    );
-
-    const body: OptionsResponse = { questions };
+    // Distractors are a simple task — always use the cheap model, regardless
+    // of the model chosen for docs/questions.
+    const question = await buildGeneratedQuestion(parsed.question, parsed.order);
+    const body: OptionsResponse = { question };
     return NextResponse.json(body);
   } catch (error) {
     return toErrorResponse(error);
@@ -65,7 +53,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 
 async function buildGeneratedQuestion(
   question: QuestionCore,
-  model: string,
   order: number,
 ): Promise<GeneratedQuestion> {
   const { system, user } = buildDistractorsPrompt(
@@ -76,7 +63,7 @@ async function buildGeneratedQuestion(
   );
 
   const result = await generateJson<unknown>({
-    model,
+    model: DISTRACTORS_MODEL_ID,
     systemInstruction: system,
     userPrompt: user,
     responseSchema: distractorsResponseSchema,
@@ -112,24 +99,16 @@ function parseOptionsRequest(payload: unknown): OptionsRequest | null {
   }
   const record = payload as Record<string, unknown>;
 
-  if (typeof record.model !== "string" || !record.model.trim()) {
+  if (!isQuestionCoreAI(record.question)) {
     return null;
   }
-  if (!Array.isArray(record.questions) || record.questions.length === 0) {
-    return null;
-  }
-  if (!record.questions.every(isQuestionCoreAI)) {
-    return null;
-  }
-
-  if (record.startOrder !== undefined && typeof record.startOrder !== "number") {
+  if (typeof record.order !== "number" || !Number.isFinite(record.order)) {
     return null;
   }
 
   return {
-    model: record.model,
-    questions: record.questions as QuestionCore[],
-    startOrder: record.startOrder as number | undefined,
+    question: record.question as QuestionCore,
+    order: record.order,
   };
 }
 
@@ -138,9 +117,6 @@ function errorResponse(message: string, status: number): NextResponse<ApiError> 
 }
 
 function toErrorResponse(error: unknown): NextResponse<ApiError> {
-  if (error instanceof ModelNotAllowedError) {
-    return errorResponse(error.message, 400);
-  }
   const message =
     error instanceof Error ? error.message : "Failed to generate options";
   return errorResponse(message, 500);

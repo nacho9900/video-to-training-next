@@ -78,16 +78,28 @@ export interface QuestionsResponse {
 }
 
 // ---- API: POST /api/generate/options ----
-// The client may chunk `questions` across several parallel calls to stay well
-// under the serverless timeout, then merge and re-sort the results by `order`.
+// Options are built one question at a time (the client fires these sequentially
+// so the quiz can be revealed question by question and never overruns a
+// timeout). The distractor model is chosen server-side — a lighter, cheaper
+// model — so the request does not carry a `model`.
 export interface OptionsRequest {
-  model: string;
-  questions: QuestionCore[];
-  /** 1-based order of the first question in this batch, used to keep ordering. */
-  startOrder?: number;
+  /** A single question to build answer options for. */
+  question: QuestionCore;
+  /** 1-based position of this question in the quiz. */
+  order: number;
 }
 export interface OptionsResponse {
-  questions: GeneratedQuestion[];
+  question: GeneratedQuestion;
+}
+
+/** A quiz question while it's being assembled: `options` is null until the
+ *  distractor step fills it in, letting the UI reveal answers progressively. */
+export interface BuildingQuestion {
+  order: number;
+  question: string;
+  correctReason: string;
+  timestamp: number;
+  options: QuestionOption[] | null;
 }
 
 // ---- API error envelope (all routes) ----

@@ -22,9 +22,11 @@ Built with **Next.js 16** (App Router), **shadcn/ui**, and the
 4. Gemini writes **documentation** and a set of **questions with correct
    answers, explanations, and video timestamps** (you choose how many —
    5 to 20, in steps of 5; 10 by default).
-5. For each question, plausible-but-wrong **distractors** are generated, and
-   the options are shuffled.
-6. You get the video back with collapsible documentation and the full quiz.
+5. For each question, plausible-but-wrong **distractors** are generated (one
+   question at a time, using a lighter/cheaper model since this step is
+   simple), and the options are shuffled.
+6. The training is revealed as it's built — video, then documentation, then
+   the questions, then each question's answers filling in one by one.
 
 The heavy work is split across several short API calls (orchestrated from the
 client) rather than one long request — see
@@ -72,6 +74,10 @@ The picker (styled like Claude's model selector) exposes:
 | `gemini-3.1-flash-lite` | Lightest / fastest |
 | `gemini-3.1-pro-preview` | Recommended for the best results |
 
+The selected model is used for the documentation and question writing. Answer
+options (distractors) always use `gemini-3.1-flash-lite` regardless of the
+selection — it's a simple, high-volume step — and the UI notes this.
+
 Disabled models (via `DISABLED_MODELS`) appear greyed out and are also
 rejected by the API, so the restriction can't be bypassed from the client.
 
@@ -104,8 +110,8 @@ in a single request.
 Since a Gemini-uploaded file persists (~48h) and is addressable by name, the
 video is uploaded once and every later step references it by name. The client
 drives a series of short calls — upload → poll for ready → docs → questions →
-options (chunked, in parallel) — each comfortably under the timeout, while a
-single progress stepper shows the real state of each step.
+options (one request per question, sequentially) — each comfortably under the
+timeout, while the UI reveals each piece of the training as it arrives.
 
 ---
 

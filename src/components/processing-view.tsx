@@ -13,6 +13,8 @@ interface Step {
   note?: string;
 }
 
+// Only the "getting ready" phase lives here. Once Gemini has ingested the
+// video, the training builds live in TrainingView instead of a stepper.
 const STEPS: Step[] = [
   { id: "uploading", label: STAGE_LABELS.uploading },
   { id: "gemini_upload", label: STAGE_LABELS.gemini_upload },
@@ -21,9 +23,6 @@ const STEPS: Step[] = [
     label: STAGE_LABELS.processing,
     note: "This can take a little while for longer videos.",
   },
-  { id: "generating_docs", label: STAGE_LABELS.generating_docs },
-  { id: "generating_questions", label: STAGE_LABELS.generating_questions },
-  { id: "generating_options", label: STAGE_LABELS.generating_options },
 ];
 
 function stepStatus(

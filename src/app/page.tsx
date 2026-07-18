@@ -3,12 +3,22 @@
 import { ApiKeyGate } from "@/components/api-key-gate";
 import { VideoPicker } from "@/components/video-picker";
 import { ProcessingView } from "@/components/processing-view";
-import { QuizView } from "@/components/quiz-view";
+import { TrainingView } from "@/components/training-view";
 import { ErrorAlert } from "@/components/error-alert";
 import { usePipeline } from "@/lib/use-pipeline";
 
+const PREPARING_STAGES = ["uploading", "gemini_upload", "processing"] as const;
+
 export default function Home() {
-  const { stage, progress, run, reset, result, error } = usePipeline();
+  const { stage, progress, videoUrl, markdown, questions, run, reset, error } =
+    usePipeline();
+
+  const isPreparing = (PREPARING_STAGES as readonly string[]).includes(stage);
+  const isBuilding =
+    stage === "generating_docs" ||
+    stage === "generating_questions" ||
+    stage === "generating_options" ||
+    stage === "done";
 
   return (
     <div className="flex flex-1 flex-col bg-background">
@@ -23,18 +33,19 @@ export default function Home() {
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6">
         <ApiKeyGate>
           {(models) => {
-            if (stage === "done" && result) {
+            if (isBuilding) {
               return (
-                <QuizView
-                  videoUrl={result.videoUrl}
-                  markdown={result.markdown}
-                  questions={result.questions}
+                <TrainingView
+                  stage={stage}
+                  videoUrl={videoUrl}
+                  markdown={markdown}
+                  questions={questions}
                   onReset={reset}
                 />
               );
             }
 
-            if (stage !== "idle") {
+            if (isPreparing) {
               return <ProcessingView stage={stage} progress={progress} />;
             }
 

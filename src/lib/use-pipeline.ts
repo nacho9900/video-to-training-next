@@ -1,15 +1,17 @@
 "use client";
 
-// Orchestrates the full client → Vercel Blob → Gemini → generation pipeline,
-// exposing a single `stage` value the UI can render as a stepper.
+// Orchestrates the full client → Vercel Blob → Gemini → generation pipeline.
+// Beyond a single `stage`, it exposes the training as it is being built —
+// video, then documentation, then question texts, then each question's answer
+// options one at a time — so the UI can reveal the result piece by piece.
 
 import { useCallback, useRef, useState } from "react";
 import { uploadVideoToBlob } from "./upload-video";
 import type {
   ApiError,
+  BuildingQuestion,
   DocsRequest,
   DocsResponse,
-  GeneratedQuestion,
   OptionsRequest,
   OptionsResponse,
   QuestionsRequest,
@@ -19,12 +21,6 @@ import type {
   UploadRequest,
   UploadResponse,
 } from "./types";
-
-export interface PipelineResult {
-  videoUrl: string;
-  markdown: string;
-  questions: GeneratedQuestion[];
-}
 
 export interface PipelineError {
   message: string;
@@ -36,7 +32,6 @@ export type PipelineStage = StageId | "idle";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
-const OPTIONS_CHUNK_SIZE = 5;
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -86,28 +81,27 @@ async function pollUntilActive(
   }
 }
 
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size));
-  }
-  return out;
-}
-
 export interface UsePipelineReturn {
   stage: PipelineStage;
   /** Upload percentage (0-100), only meaningful while stage === "uploading". */
   progress: number;
+  /** Blob URL of the uploaded video, available from the upload step onward. */
+  videoUrl: string | null;
+  /** Generated documentation markdown, null until it's ready. */
+  markdown: string | null;
+  /** Questions as they're built; each `options` is null until generated. */
+  questions: BuildingQuestion[];
   run: (file: File, model: string, numberOfQuestions: number) => Promise<void>;
   reset: () => void;
-  result: PipelineResult | null;
   error: PipelineError | null;
 }
 
 export function usePipeline(): UsePipelineReturn {
   const [stage, setStage] = useState<PipelineStage>("idle");
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<PipelineResult | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [markdown, setMarkdown] = useState<string | null>(null);
+  const [questions, setQuestions] = useState<BuildingQuestion[]>([]);
   const [error, setError] = useState<PipelineError | null>(null);
   const runIdRef = useRef(0);
 
@@ -116,98 +110,116 @@ export function usePipeline(): UsePipelineReturn {
     runIdRef.current += 1;
     setStage("idle");
     setProgress(0);
-    setResult(null);
+    setVideoUrl(null);
+    setMarkdown(null);
+    setQuestions([]);
     setError(null);
   }, []);
 
-  const run = useCallback(async (file: File, model: string, numberOfQuestions: number) => {
-    const runId = ++runIdRef.current;
-    const isCurrent = () => runIdRef.current === runId;
+  const run = useCallback(
+    async (file: File, model: string, numberOfQuestions: number) => {
+      const runId = ++runIdRef.current;
+      const isCurrent = () => runIdRef.current === runId;
 
-    setError(null);
-    setResult(null);
-    setProgress(0);
+      setError(null);
+      setMarkdown(null);
+      setQuestions([]);
+      setVideoUrl(null);
+      setProgress(0);
 
-    // Tracks the stage currently executing so a failure can report where it
-    // happened, even after the stage state is reset back to "idle".
-    let activeStep: StageId = "uploading";
-    const goto = (step: StageId) => {
-      activeStep = step;
-      setStage(step);
-    };
+      // Tracks the stage currently executing so a failure can report where it
+      // happened, even after the stage state is reset back to "idle".
+      let activeStep: StageId = "uploading";
+      const goto = (step: StageId) => {
+        activeStep = step;
+        setStage(step);
+      };
 
-    try {
-      // 1. Upload the raw video straight to Vercel Blob.
-      goto("uploading");
-      const blobUrl = await uploadVideoToBlob(file, (pct) => {
-        if (isCurrent()) setProgress(pct);
-      });
-      if (!isCurrent()) return;
+      try {
+        // 1. Upload the raw video straight to Vercel Blob.
+        goto("uploading");
+        const blobUrl = await uploadVideoToBlob(file, (pct) => {
+          if (isCurrent()) setProgress(pct);
+        });
+        if (!isCurrent()) return;
+        setVideoUrl(blobUrl);
 
-      // 2. Hand the blob to Gemini's Files API.
-      goto("gemini_upload");
-      const { fileName } = await postJson<UploadResponse>(
-        "/api/gemini/upload",
-        { blobUrl } satisfies UploadRequest,
-      );
-      if (!isCurrent()) return;
+        // 2. Hand the blob to Gemini's Files API.
+        goto("gemini_upload");
+        const { fileName } = await postJson<UploadResponse>(
+          "/api/gemini/upload",
+          { blobUrl } satisfies UploadRequest,
+        );
+        if (!isCurrent()) return;
 
-      // 3. Wait for Gemini to finish ingesting the file.
-      goto("processing");
-      await pollUntilActive(fileName, isCurrent);
-      if (!isCurrent()) return;
+        // 3. Wait for Gemini to finish ingesting the file.
+        goto("processing");
+        await pollUntilActive(fileName, isCurrent);
+        if (!isCurrent()) return;
 
-      // 4 & 5. Docs and question-writing both only need `fileName`, so they
-      // run concurrently; we still advance the stage monotonically so the
-      // stepper reads top-to-bottom.
-      goto("generating_docs");
-      const docsPromise = postJson<DocsResponse>("/api/generate/docs", {
-        fileName,
-        model,
-      } satisfies DocsRequest);
-      const questionsPromise = postJson<QuestionsResponse>(
-        "/api/generate/questions",
-        { fileName, model, numberOfQuestions } satisfies QuestionsRequest,
-      );
+        // 4. Docs and questions only need `fileName`, so we fetch them
+        // concurrently but reveal them in order: documentation first, then the
+        // question texts.
+        goto("generating_docs");
+        const docsPromise = postJson<DocsResponse>("/api/generate/docs", {
+          fileName,
+          model,
+        } satisfies DocsRequest);
+        const questionsPromise = postJson<QuestionsResponse>(
+          "/api/generate/questions",
+          { fileName, model, numberOfQuestions } satisfies QuestionsRequest,
+        );
 
-      const questionsRes = await questionsPromise;
-      if (!isCurrent()) return;
-      goto("generating_questions");
+        const docsRes = await docsPromise;
+        if (!isCurrent()) return;
+        setMarkdown(docsRes.markdown);
 
-      // 6. Build multiple-choice options for every question, chunked and
-      // fired in parallel to stay well under any serverless timeout.
-      goto("generating_options");
-      const batches = chunk(questionsRes.questions, OPTIONS_CHUNK_SIZE);
-      const optionsResults = await Promise.all(
-        batches.map((batch, idx) =>
-          postJson<OptionsResponse>("/api/generate/options", {
-            model,
-            questions: batch,
-            startOrder: idx * OPTIONS_CHUNK_SIZE + 1,
-          } satisfies OptionsRequest),
-        ),
-      );
-      if (!isCurrent()) return;
+        // 5. Reveal the question texts (answers still pending).
+        goto("generating_questions");
+        const questionsRes = await questionsPromise;
+        if (!isCurrent()) return;
+        const cores = questionsRes.questions;
+        setQuestions(
+          cores.map((core, index) => ({
+            order: index + 1,
+            question: core.question,
+            correctReason: core.correctReason,
+            timestamp: core.timestamp,
+            options: null,
+          })),
+        );
 
-      const questions = optionsResults
-        .flatMap((r) => r.questions)
-        .sort((a, b) => a.order - b.order);
+        // 6. Build answer options one question at a time, revealing each as it
+        // completes. Sequential + the cheap model keeps it reliable and fast
+        // enough without ever overrunning a serverless timeout.
+        goto("generating_options");
+        for (let i = 0; i < cores.length; i++) {
+          const order = i + 1;
+          const { question } = await postJson<OptionsResponse>(
+            "/api/generate/options",
+            { question: cores[i], order } satisfies OptionsRequest,
+          );
+          if (!isCurrent()) return;
+          setQuestions((prev) =>
+            prev.map((q) =>
+              q.order === question.order
+                ? { ...q, options: question.options }
+                : q,
+            ),
+          );
+        }
 
-      // Docs were kicked off in parallel with question generation; make sure
-      // they're done before we call the pipeline complete.
-      const { markdown } = await docsPromise;
-      if (!isCurrent()) return;
+        goto("done");
+      } catch (err) {
+        if (!isCurrent()) return;
+        const message =
+          err instanceof Error ? err.message : "Something went wrong.";
+        setError({ message, step: activeStep });
+        setStage("idle");
+      }
+    },
+    [],
+  );
 
-      goto("done");
-      setResult({ videoUrl: blobUrl, markdown, questions });
-    } catch (err) {
-      if (!isCurrent()) return;
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError({ message, step: activeStep });
-      setStage("idle");
-    }
-  }, []);
-
-  return { stage, progress, run, reset, result, error };
+  return { stage, progress, videoUrl, markdown, questions, run, reset, error };
 }
