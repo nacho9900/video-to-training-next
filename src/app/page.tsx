@@ -6,6 +6,7 @@ import { ProcessingView } from "@/components/processing-view";
 import { TrainingView } from "@/components/training-view";
 import { ErrorAlert } from "@/components/error-alert";
 import { usePipeline } from "@/lib/use-pipeline";
+import { cn } from "@/lib/utils";
 
 const PREPARING_STAGES = ["uploading", "gemini_upload", "processing"] as const;
 
@@ -32,14 +33,24 @@ export default function Home() {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <header className="border-b">
-        <div className="mx-auto flex w-full max-w-2xl items-center px-6 py-4">
+        <div
+          className={cn(
+            "mx-auto flex w-full items-center px-6 py-4",
+            isBuilding ? "max-w-5xl" : "max-w-2xl",
+          )}
+        >
           <span className="text-sm font-semibold tracking-tight">
             Video to Training
           </span>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6">
+      <main
+        className={cn(
+          "mx-auto flex w-full flex-1 flex-col px-6",
+          isBuilding ? "max-w-5xl" : "max-w-2xl",
+        )}
+      >
         <ApiKeyGate>
           {(models) => {
             if (isBuilding) {

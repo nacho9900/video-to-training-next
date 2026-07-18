@@ -8,6 +8,7 @@ import {
   FileText,
   Loader2,
   RotateCcw,
+  Video,
 } from "lucide-react";
 import {
   Collapsible,
@@ -239,47 +240,78 @@ export function TrainingView({
   onReset,
 }: TrainingViewProps) {
   const [docsOpen, setDocsOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [videoBroken, setVideoBroken] = useState(false);
 
   const answered = questions.filter((q) => q.options).length;
   const total = questions.length;
   const isDone = stage === "done";
 
+  const videoNode = videoUrl ? (
+    videoBroken ? (
+      <div className="flex flex-col items-center gap-2 rounded-xl border bg-muted/30 px-6 py-10 text-center">
+        <p className="text-sm text-muted-foreground">
+          This video format can&apos;t be previewed inline in your browser.
+        </p>
+        <a
+          href={videoUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4"
+        >
+          <ExternalLink className="size-3.5" />
+          Open the video in a new tab
+        </a>
+      </div>
+    ) : (
+      <video
+        src={videoUrl}
+        controls
+        playsInline
+        preload="metadata"
+        onError={() => setVideoBroken(true)}
+        className="mx-auto max-h-[55vh] w-auto max-w-full rounded-xl bg-black shadow-sm lg:max-h-[calc(100vh-7rem)]"
+      />
+    )
+  ) : null;
+
   return (
-    <div className="flex w-full flex-col gap-8 py-10">
+    <div className="flex w-full flex-col gap-6 py-8 lg:flex-row lg:items-start lg:gap-8 lg:py-10">
+      {/* Video: left column on desktop, collapsed by default on mobile */}
       {videoUrl && (
-        <Reveal>
-          {videoBroken ? (
-            <div className="flex flex-col items-center gap-2 rounded-xl border bg-muted/30 px-6 py-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                This video format can&apos;t be previewed inline in your
-                browser.
-              </p>
-              <a
-                href={videoUrl}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline underline-offset-4"
-              >
-                <ExternalLink className="size-3.5" />
-                Open the video in a new tab
-              </a>
-            </div>
-          ) : (
-            <video
-              src={videoUrl}
-              controls
-              playsInline
-              preload="metadata"
-              onError={() => setVideoBroken(true)}
-              className="w-full rounded-xl bg-black shadow-sm"
-            />
-          )}
-        </Reveal>
+        <div className="lg:sticky lg:top-6 lg:w-[38%] lg:shrink-0 lg:self-start">
+          {/* Mobile: collapsible so it doesn't push the content down */}
+          <div className="lg:hidden">
+            <Collapsible open={videoOpen} onOpenChange={setVideoOpen}>
+              <Card>
+                <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <Video className="size-4 text-muted-foreground" />
+                    Video
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "size-4 text-muted-foreground transition-transform",
+                      videoOpen && "rotate-180",
+                    )}
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <Separator />
+                  <div className="p-3">{videoNode}</div>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          </div>
+          {/* Desktop: always visible */}
+          <Reveal className="hidden lg:block">{videoNode}</Reveal>
+        </div>
       )}
 
-      {/* Documentation */}
-      {markdown ? (
+      {/* Generated content: right column */}
+      <div className="flex min-w-0 flex-1 flex-col gap-8">
+        {/* Documentation */}
+        {markdown ? (
         <Reveal>
           <Collapsible open={docsOpen} onOpenChange={setDocsOpen}>
             <Card>
@@ -351,9 +383,10 @@ export function TrainingView({
             ))}
           </div>
         </div>
-      ) : (
-        <PendingRow label="Generating questions" />
-      )}
+        ) : (
+          <PendingRow label="Generating questions" />
+        )}
+      </div>
     </div>
   );
 }
