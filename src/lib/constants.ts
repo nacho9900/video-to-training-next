@@ -17,6 +17,3 @@ export function clampQuestionCount(value: number): number {
 
 /** Distractors (wrong options) generated per question. */
 export const FALSE_OPTIONS_PER_QUESTION = 3;
-
-/** UI response language for the generated content. */
-export const RESPONSE_LANGUAGE = "English";

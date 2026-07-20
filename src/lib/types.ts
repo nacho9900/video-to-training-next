@@ -62,6 +62,8 @@ export interface StatusResponse {
 // (text-only, cheap model). Used in the history list and shown in the result.
 export interface TitleRequest {
   text: string;
+  /** Generation language id (see lib/languages). */
+  language: string;
 }
 export interface TitleResponse {
   title: string;
@@ -71,6 +73,7 @@ export interface TitleResponse {
 export interface DocsRequest {
   fileName: string;
   model: string;
+  language: string;
 }
 export interface DocsResponse {
   /** Markdown documentation derived from the video. */
@@ -82,6 +85,7 @@ export interface QuestionsRequest {
   fileName: string;
   model: string;
   numberOfQuestions: number;
+  language: string;
 }
 export interface QuestionsResponse {
   questions: QuestionCore[];
@@ -97,6 +101,7 @@ export interface OptionsRequest {
   question: QuestionCore;
   /** 1-based position of this question in the quiz. */
   order: number;
+  language: string;
 }
 export interface OptionsResponse {
   question: GeneratedQuestion;

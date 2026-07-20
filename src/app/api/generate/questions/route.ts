@@ -7,6 +7,7 @@ import {
   ModelNotAllowedError,
 } from "@/lib/env.server";
 import { generateJson } from "@/lib/gemini";
+import { languagePromptName } from "@/lib/languages";
 import {
   buildQuestionsPrompt,
   isQuestionsAIResponse,
@@ -37,7 +38,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertModelEnabled(parsed.model);
 
-    const { system, user } = buildQuestionsPrompt(parsed.numberOfQuestions);
+    const { system, user } = buildQuestionsPrompt(
+      parsed.numberOfQuestions,
+      languagePromptName(parsed.language),
+    );
     const result = await generateJson<unknown>({
       model: parsed.model,
       systemInstruction: system,
@@ -71,7 +75,12 @@ function parseQuestionsRequest(payload: unknown): QuestionsRequest | null {
     return null;
   }
   const numberOfQuestions = clampQuestionCount(Number(record.numberOfQuestions));
-  return { fileName: record.fileName, model: record.model, numberOfQuestions };
+  return {
+    fileName: record.fileName,
+    model: record.model,
+    numberOfQuestions,
+    language: typeof record.language === "string" ? record.language : "",
+  };
 }
 
 function errorResponse(message: string, status: number): NextResponse<ApiError> {

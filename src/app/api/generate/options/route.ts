@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { FALSE_OPTIONS_PER_QUESTION } from "@/lib/constants";
 import { hasGeminiKey } from "@/lib/env.server";
 import { generateJson } from "@/lib/gemini";
+import { languagePromptName } from "@/lib/languages";
 import { DISTRACTORS_MODEL_ID } from "@/lib/models";
 import {
   buildDistractorsPrompt,
@@ -43,7 +44,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     // Distractors are a simple task — always use the cheap model, regardless
     // of the model chosen for docs/questions.
-    const question = await buildGeneratedQuestion(parsed.question, parsed.order);
+    const question = await buildGeneratedQuestion(
+      parsed.question,
+      parsed.order,
+      languagePromptName(parsed.language),
+    );
     const body: OptionsResponse = { question };
     return NextResponse.json(body);
   } catch (error) {
@@ -54,12 +59,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 async function buildGeneratedQuestion(
   question: QuestionCore,
   order: number,
+  language: string,
 ): Promise<GeneratedQuestion> {
   const { system, user } = buildDistractorsPrompt(
     question.question,
     question.correctAnswer,
     question.correctReason,
     FALSE_OPTIONS_PER_QUESTION,
+    language,
   );
 
   const result = await generateJson<unknown>({
@@ -109,6 +116,7 @@ function parseOptionsRequest(payload: unknown): OptionsRequest | null {
   return {
     question: record.question as QuestionCore,
     order: record.order,
+    language: typeof record.language === "string" ? record.language : "",
   };
 }
 

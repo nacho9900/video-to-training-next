@@ -159,8 +159,8 @@ export default function Home() {
                       </div>
                       <VideoPicker
                         models={models}
-                        onSubmit={(file, model, count) =>
-                          run(file, model, count)
+                        onSubmit={(file, model, count, language) =>
+                          run(file, model, count, language)
                         }
                       />
                     </div>

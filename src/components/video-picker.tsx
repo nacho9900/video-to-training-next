@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { ModelSelect, pickDefaultModelId } from "@/components/model-select";
+import { LanguageSelect } from "@/components/language-select";
 import type { ModelInfo } from "@/lib/models";
 import { DEFAULT_MODEL_ID } from "@/lib/models";
+import { DEFAULT_LANGUAGE_ID } from "@/lib/languages";
 import {
   DEFAULT_NUMBER_OF_QUESTIONS,
   MAX_QUESTIONS,
@@ -18,7 +20,12 @@ import { cn } from "@/lib/utils";
 
 interface VideoPickerProps {
   models: ModelInfo[];
-  onSubmit: (file: File, model: string, numberOfQuestions: number) => void;
+  onSubmit: (
+    file: File,
+    model: string,
+    numberOfQuestions: number,
+    language: string,
+  ) => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -42,6 +49,7 @@ export function VideoPicker({ models, onSubmit }: VideoPickerProps) {
   const [numberOfQuestions, setNumberOfQuestions] = useState(
     DEFAULT_NUMBER_OF_QUESTIONS,
   );
+  const [language, setLanguage] = useState(DEFAULT_LANGUAGE_ID);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Derived, not stateful: recomputed whenever `file` changes, and revoked
@@ -148,7 +156,10 @@ export function VideoPicker({ models, onSubmit }: VideoPickerProps) {
         )}
       </div>
 
-      <ModelSelect models={models} value={model} onChange={setModel} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <ModelSelect models={models} value={model} onChange={setModel} />
+        <LanguageSelect value={language} onChange={setLanguage} />
+      </div>
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -173,7 +184,9 @@ export function VideoPicker({ models, onSubmit }: VideoPickerProps) {
       <Button
         size="lg"
         disabled={!file}
-        onClick={() => file && onSubmit(file, model, numberOfQuestions)}
+        onClick={() =>
+          file && onSubmit(file, model, numberOfQuestions, language)
+        }
         className="w-full"
       >
         <Sparkles />

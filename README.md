@@ -14,7 +14,8 @@ Built with **Next.js 16** (App Router), **shadcn/ui**, and the
 
 ## How it works
 
-1. You pick a video and a Gemini model.
+1. You pick a video, a Gemini model, and the language the training is generated
+   in (Spanish by default, or English — the UI itself stays in English).
 2. The video is uploaded to **Vercel Blob** (directly from the browser, so it
    isn't limited by the serverless request body size).
 3. The server hands the video to the **Gemini Files API** and waits for it to

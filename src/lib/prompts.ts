@@ -7,8 +7,6 @@
 
 import { Type, type Schema } from "@google/genai";
 
-import { RESPONSE_LANGUAGE } from "./constants";
-
 export interface PromptPair {
   system: string;
   user: string;
@@ -37,13 +35,16 @@ export interface TitleAIResponse {
   title: string;
 }
 
-function withLanguageNote(prompt: string): string {
-  return `${prompt}\n\nIMPORTANT: Respond in ${RESPONSE_LANGUAGE}.`;
+function withLanguageNote(prompt: string, language: string): string {
+  return `${prompt}\n\nIMPORTANT: Respond in ${language}.`;
 }
 
 // ---- Questions with correct answers ----
 
-export function buildQuestionsPrompt(numberOfQuestions: number): PromptPair {
+export function buildQuestionsPrompt(
+  numberOfQuestions: number,
+  language: string,
+): PromptPair {
   const system =
     "You are an expert instructional designer and assessment writer. " +
     "You create clear, specific multiple-choice questions that test genuine understanding of what a video teaches — on any subject, from simple explanations to complex technical topics.";
@@ -111,7 +112,7 @@ export function buildQuestionsPrompt(numberOfQuestions: number): PromptPair {
     '  "timestamp": 135\n' +
     "}";
 
-  return { system, user: withLanguageNote(user) };
+  return { system, user: withLanguageNote(user, language) };
 }
 
 export const questionsResponseSchema: Schema = {
@@ -141,6 +142,7 @@ export function buildDistractorsPrompt(
   correctAnswer: string,
   correctReason: string,
   n: number,
+  language: string,
 ): PromptPair {
   const system =
     "You are an expert in creating effective multiple-choice assessment questions. " +
@@ -194,7 +196,7 @@ export function buildDistractorsPrompt(
     'False options: ["Releasing oxygen into the air", "Storing glucose in the leaf", "Transporting water from the roots"]\n' +
     "Explanation: Real parts of plant biology, but not chlorophyll's role — clearly different concepts, not subtle variations.";
 
-  return { system, user: withLanguageNote(user) };
+  return { system, user: withLanguageNote(user, language) };
 }
 
 export const distractorsResponseSchema: Schema = {
@@ -210,7 +212,7 @@ export const distractorsResponseSchema: Schema = {
 
 // ---- Title ----
 
-export function buildTitlePrompt(text: string): PromptPair {
+export function buildTitlePrompt(text: string, language: string): PromptPair {
   const system =
     "You write short, descriptive titles for training modules. " +
     "You capture the subject of the training in a few words.";
@@ -224,7 +226,7 @@ export function buildTitlePrompt(text: string): PromptPair {
     "TRAINING CONTENT:\n" +
     text;
 
-  return { system, user: withLanguageNote(user) };
+  return { system, user: withLanguageNote(user, language) };
 }
 
 export const titleResponseSchema: Schema = {
@@ -245,7 +247,7 @@ export function isTitleAIResponse(value: unknown): value is TitleAIResponse {
 
 // ---- Documentation ----
 
-export function buildDocsPrompt(): PromptPair {
+export function buildDocsPrompt(language: string): PromptPair {
   const system =
     "You are an expert technical writer and instructional designer. " +
     "You turn explainer videos on any topic — tutorials, lessons, demos, walkthroughs — into thorough, well-organized reference documentation.";
@@ -263,7 +265,7 @@ export function buildDocsPrompt(): PromptPair {
     "- Use proper Markdown formatting (headings, bullet lists, numbered lists, bold for key terms) so the output renders cleanly.\n\n" +
     "Respond with the documentation content only, as a single Markdown string.";
 
-  return { system, user: withLanguageNote(user) };
+  return { system, user: withLanguageNote(user, language) };
 }
 
 export const docsResponseSchema: Schema = {

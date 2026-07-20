@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { hasGeminiKey } from "@/lib/env.server";
 import { generateJson } from "@/lib/gemini";
+import { languagePromptName } from "@/lib/languages";
 import { DISTRACTORS_MODEL_ID } from "@/lib/models";
 import {
   buildTitlePrompt,
@@ -31,7 +32,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const { system, user } = buildTitlePrompt(parsed.text);
+    const { system, user } = buildTitlePrompt(
+      parsed.text,
+      languagePromptName(parsed.language),
+    );
     // Titles are simple — always use the cheap model.
     const result = await generateJson<unknown>({
       model: DISTRACTORS_MODEL_ID,
@@ -61,7 +65,10 @@ function parseTitleRequest(payload: unknown): TitleRequest | null {
   if (typeof record.text !== "string" || !record.text.trim()) {
     return null;
   }
-  return { text: record.text };
+  return {
+    text: record.text,
+    language: typeof record.language === "string" ? record.language : "",
+  };
 }
 
 function errorResponse(message: string, status: number): NextResponse<ApiError> {

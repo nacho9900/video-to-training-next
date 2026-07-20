@@ -103,7 +103,12 @@ export interface UsePipelineReturn {
   docsFailed: boolean;
   /** Questions as they're built; each `options` is null until generated. */
   questions: BuildingQuestion[];
-  run: (file: File, model: string, numberOfQuestions: number) => Promise<void>;
+  run: (
+    file: File,
+    model: string,
+    numberOfQuestions: number,
+    language: string,
+  ) => Promise<void>;
   reset: () => void;
   error: PipelineError | null;
 }
@@ -145,7 +150,12 @@ export function usePipeline(): UsePipelineReturn {
   }, [revokeObjectUrl]);
 
   const run = useCallback(
-    async (file: File, model: string, numberOfQuestions: number) => {
+    async (
+      file: File,
+      model: string,
+      numberOfQuestions: number,
+      language: string,
+    ) => {
       const runId = ++runIdRef.current;
       const isCurrent = () => runIdRef.current === runId;
 
@@ -205,6 +215,7 @@ export function usePipeline(): UsePipelineReturn {
         const docsPromise = postJson<DocsResponse>("/api/generate/docs", {
           fileName,
           model,
+          language,
         } satisfies DocsRequest)
           .then((res) => {
             docsMarkdown = res.markdown;
@@ -219,7 +230,12 @@ export function usePipeline(): UsePipelineReturn {
         goto("generating_questions");
         const questionsRes = await postJson<QuestionsResponse>(
           "/api/generate/questions",
-          { fileName, model, numberOfQuestions } satisfies QuestionsRequest,
+          {
+            fileName,
+            model,
+            numberOfQuestions,
+            language,
+          } satisfies QuestionsRequest,
         );
         if (!isCurrent()) return;
         const cores = questionsRes.questions;
@@ -237,6 +253,7 @@ export function usePipeline(): UsePipelineReturn {
         // text-only) — it reveals whenever it's ready, in parallel.
         const titlePromise = postJson<TitleResponse>("/api/generate/title", {
           text: cores.map((c, i) => `${i + 1}. ${c.question}`).join("\n"),
+          language,
         } satisfies TitleRequest)
           .then((res) => {
             titleValue = res.title;
@@ -254,7 +271,7 @@ export function usePipeline(): UsePipelineReturn {
           const order = i + 1;
           const { question } = await postJson<OptionsResponse>(
             "/api/generate/options",
-            { question: cores[i], order } satisfies OptionsRequest,
+            { question: cores[i], order, language } satisfies OptionsRequest,
           );
           if (!isCurrent()) return;
           built.push(question);

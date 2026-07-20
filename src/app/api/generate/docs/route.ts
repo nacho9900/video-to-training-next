@@ -6,6 +6,7 @@ import {
   ModelNotAllowedError,
 } from "@/lib/env.server";
 import { generateJson } from "@/lib/gemini";
+import { languagePromptName } from "@/lib/languages";
 import { buildDocsPrompt, docsResponseSchema, isDocsAIResponse } from "@/lib/prompts";
 import type { ApiError, DocsRequest, DocsResponse } from "@/lib/types";
 
@@ -32,7 +33,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     assertModelEnabled(parsed.model);
 
-    const { system, user } = buildDocsPrompt();
+    const { system, user } = buildDocsPrompt(
+      languagePromptName(parsed.language),
+    );
     const result = await generateJson<unknown>({
       model: parsed.model,
       systemInstruction: system,
@@ -63,7 +66,11 @@ function parseDocsRequest(payload: unknown): DocsRequest | null {
   if (typeof record.model !== "string" || !record.model.trim()) {
     return null;
   }
-  return { fileName: record.fileName, model: record.model };
+  return {
+    fileName: record.fileName,
+    model: record.model,
+    language: typeof record.language === "string" ? record.language : "",
+  };
 }
 
 function errorResponse(message: string, status: number): NextResponse<ApiError> {
